@@ -29,7 +29,7 @@ impl<'a> VRF<PublicKey<'a>, SecretKey<'a>> for DummyVRF {
         Ok(vec![])
     }
     // Added by Kevin G. Zhang 
-    fn sortition_vote(&mut self, hash_ref: &[u8], w: u64, committee_size:u32, candidates_size:u64) -> Result<u32, Self::Error>{
+    fn sortition_vote(&mut self, hash_ref: &[u8], w: u32, committee_size:u32, candidates_size:u64) -> Result<u32, Self::Error>{
         Ok(0)
     }
 }

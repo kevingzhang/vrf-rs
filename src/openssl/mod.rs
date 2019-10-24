@@ -580,7 +580,58 @@ impl VRF<&[u8], &[u8]> for ECVRF {
         Ok(beta)
     }
 
-    fn sortition_vote(&mut self, hash_ref: &[u8], w: u64, committee_size:u32, candidates_size:u64) -> Result<u32, Self::Error>{
+    fn sortition_vote(&mut self, hash_ref: &[u8], weight:u32, committee_size:u32, total_weight:u64) -> Result<u32, Self::Error>{
+        fn combination(m: u32, n: u32) ->u64{
+            let mut num:u64 = 1;//BigNum::from_u32(std::u32::MAX).unwrap();
+            let mut count = 0; //zero;
+            
+            let mut i = m;//BigNum::from_u32(m).unwrap();
+            while i > 0 {
+                if count == n {
+                    break;
+                }
+
+                num = num * i as u64 / (i as u64 + n as u64 - m as u64);
+                count = count + 1;
+                i = i - 1;
+            }
+            num
+        }
+
+        fn binomial(k: u32, weight: u32, p:f64) ->u32{
+            let a = combination(weight, k);
+            let b = p.powi(k as i32);
+
+            let c = (1.0 - p).powi(weight as i32 - k as i32);
+            (a as f64* b * c ) as u32
+        }
+        fn cumulative(j: u32, weight: u32, p:f64) -> u32 {
+            
+            let mut sum: u32 = 0;
+            for i in 0..= j{
+                sum = sum + binomial(i, weight, p);
+            }
+            sum
+        }
+        
+        let mut big_hash = BigNum::from_slice(hash_ref)?;
+        let max_buffer = BigNum::from_slice(&[std::u8::MAX;32])?;
+        
+        let mut j:u32 = 0;
+        let p = committee_size as f64 / total_weight as f64;
+        let mut curr = cumulative(j, weight, p);
+        
+        while j <= weight && big_hash >= &BigNum::from_u32(curr).unwrap() * &max_buffer {
+            j += 1;
+            //println!("in while loop now. j = {}", j);
+            let next = cumulative(j, weight, p);
+            //println!("before compare value:{}, next:{}", value, next);
+            if big_hash < &BigNum::from_u32(next).unwrap() * &max_buffer{
+                return Ok(j);
+            }
+            curr = next;
+        }
+        
         Ok(0)
     }
 }
@@ -1065,8 +1116,8 @@ mod test {
     fn test_dummy(){
         let mut vrf = ECVRF::from_suite(CipherSuite::SECP256K1_SHA256_TAI).unwrap();
         // Public Key (labelled as y)
-        let y = hex::decode("032c8c31fc9f990c6b55e3865a184a4ce50e09481f2eaeb3e60ec1cea13a6ae645")
+        let y = hex::decode("4ebd3943bcad3cc9aae2fb6a1e3cc22b054446dc8fcb779730425a0721dde55a")
             .unwrap();
-        assert_eq!(vrf.sortition_vote(&y, 100 as u64, 10 as u32, 10000 as u64).unwrap(), 0);
+        assert_eq!(vrf.sortition_vote(&y, 100 as u32, 10 as u32, 10000 as u64).unwrap(), 0);
     }
 }
