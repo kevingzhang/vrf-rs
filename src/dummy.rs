@@ -28,6 +28,10 @@ impl<'a> VRF<PublicKey<'a>, SecretKey<'a>> for DummyVRF {
     fn verify(&mut self, _y: PublicKey, _pi: &[u8], _alpha: &[u8]) -> Result<Vec<u8>, Self::Error> {
         Ok(vec![])
     }
+    // Added by Kevin G. Zhang 
+    fn sortition_vote(&mut self, hash_ref: &[u8], w: u64, committee_size:u32, candidates_size:u64) -> Result<u32, Self::Error>{
+        Ok(0)
+    }
 }
 
 #[cfg(test)]

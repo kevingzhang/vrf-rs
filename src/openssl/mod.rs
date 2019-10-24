@@ -579,6 +579,10 @@ impl VRF<&[u8], &[u8]> for ECVRF {
 
         Ok(beta)
     }
+
+    fn sortition_vote(&mut self, hash_ref: &[u8], w: u64, committee_size:u32, candidates_size:u64) -> Result<u32, Self::Error>{
+        Ok(0)
+    }
 }
 
 #[cfg(test)]
@@ -1054,5 +1058,15 @@ mod test {
         // The original message was "sample"
         let alpha2 = b"notsample".to_vec();
         assert!(vrf.verify(&y, &pi, &alpha2).is_err());
+    }
+
+    /// Test sortition vote function
+    #[test]
+    fn test_dummy(){
+        let mut vrf = ECVRF::from_suite(CipherSuite::SECP256K1_SHA256_TAI).unwrap();
+        // Public Key (labelled as y)
+        let y = hex::decode("032c8c31fc9f990c6b55e3865a184a4ce50e09481f2eaeb3e60ec1cea13a6ae645")
+            .unwrap();
+        assert_eq!(vrf.sortition_vote(&y, 100 as u64, 10 as u32, 10000 as u64).unwrap(), 0);
     }
 }

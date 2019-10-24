@@ -46,4 +46,12 @@ pub trait VRF<PublicKey, SecretKey> {
     ///
     /// * If successful, a vector of octets with the VRF hash output.
     fn verify(&mut self, y: PublicKey, pi: &[u8], alpha: &[u8]) -> Result<Vec<u8>, Self::Error>;
+
+
+    /// (Added by Kevin G. Zhang)
+    /// Sortition Vote
+    /// 
+    /// 
+    /// 
+    fn sortition_vote(&mut self, hash_ref: &[u8], w: u64, committee_size:u32, candidates_size:u64) -> Result<u32, Self::Error>;
 }
