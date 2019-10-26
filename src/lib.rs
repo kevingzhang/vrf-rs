@@ -53,5 +53,5 @@ pub trait VRF<PublicKey, SecretKey> {
     /// 
     /// 
     /// 
-    fn sortition_vote(&mut self, hash_ref: &[u8], w: u32, committee_size:u32, candidates_size:u64) -> Result<u32, Self::Error>;
+    fn sortition_vote(&mut self, hash_ref: &[u8;32], w: u32, committee_size:u32, candidates_size:u64) -> Result<u32, Self::Error>;
 }

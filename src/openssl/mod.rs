@@ -38,8 +38,9 @@ use openssl::{
     error::ErrorStack,
     hash::{hash, MessageDigest},
     nid::Nid,
+    rand,
 };
-
+use std::convert::TryInto;
 use crate::VRF;
 
 use self::utils::{append_leading_zeros, bits2int, bits2octets};
@@ -580,9 +581,21 @@ impl VRF<&[u8], &[u8]> for ECVRF {
         Ok(beta)
     }
 
-    fn sortition_vote(&mut self, hash_ref: &[u8], weight:u32, committee_size:u32, total_weight:u64) -> Result<u32, Self::Error>{
-        fn combination(m: u32, n: u32) ->u64{
-            let mut num:u64 = 1;//BigNum::from_u32(std::u32::MAX).unwrap();
+    fn sortition_vote(&mut self, hash_ref: &[u8;32], weight:u32, committee_size:u32, total_weight:u64) -> Result<u32, Self::Error>{
+        fn hash256_to_ratio_f64(buf: &[u8;32])->f64{
+            let big_hash = BigNum::from_slice(buf).unwrap();
+            let max_buffer = BigNum::from_slice(&[std::u8::MAX;32]).unwrap();
+            let mut a = big_hash.to_owned().unwrap();
+            a.mul_word(std::u32::MAX);
+            let first = a.to_owned().unwrap();
+            let mut result: BigNum = &first / &max_buffer;
+
+            let v:u64 = result.div_word(std::u32::MAX).unwrap();
+            let ratio = v as f64 / std::u32::MAX as f64;
+            ratio
+        }
+        fn combination(m: u32, n: u32) ->f64{
+            let mut num:f64 = 1 as f64;
             let mut count = 0; //zero;
             
             let mut i = m;//BigNum::from_u32(m).unwrap();
@@ -590,46 +603,46 @@ impl VRF<&[u8], &[u8]> for ECVRF {
                 if count == n {
                     break;
                 }
-
-                num = num * i as u64 / (i as u64 + n as u64 - m as u64);
+                num = num * i as f64 / (i + n - m) as f64;
                 count = count + 1;
                 i = i - 1;
             }
             num
         }
 
-        fn binomial(k: u32, weight: u32, p:f64) ->u32{
-            let a = combination(weight, k);
-            let b = p.powi(k as i32);
+        fn binomial(k: u32, weight: u32, p:f64) ->f64{
+            let a: f64 = combination(weight, k);
+            let b: f64 = p.powi(k as i32);
 
-            let c = (1.0 - p).powi(weight as i32 - k as i32);
-            (a as f64* b * c ) as u32
+            let c: f64 = (1.0 - p).powi(weight as i32 - k as i32);
+            a * b * c
         }
-        fn cumulative(j: u32, weight: u32, p:f64) -> u32 {
-            
-            let mut sum: u32 = 0;
+        fn cumulative(j: u32, weight: u32, p:f64) -> f64 {
+            let zero = BigNum::from_u32(0).unwrap();
+            let mut sum: f64 = 0 as f64;
             for i in 0..= j{
                 sum = sum + binomial(i, weight, p);
             }
             sum
         }
         
-        let mut big_hash = BigNum::from_slice(hash_ref)?;
-        let max_buffer = BigNum::from_slice(&[std::u8::MAX;32])?;
         
+        let max_buffer = BigNum::from_slice(&[std::u8::MAX;32])?;
+        let value: f64 = hash256_to_ratio_f64(hash_ref);
         let mut j:u32 = 0;
         let p = committee_size as f64 / total_weight as f64;
         let mut curr = cumulative(j, weight, p);
         
-        while j <= weight && big_hash >= &BigNum::from_u32(curr).unwrap() * &max_buffer {
+        while j <= weight && value >= curr {
             j += 1;
-            //println!("in while loop now. j = {}", j);
             let next = cumulative(j, weight, p);
-            //println!("before compare value:{}, next:{}", value, next);
-            if big_hash < &BigNum::from_u32(next).unwrap() * &max_buffer{
+            
+            if value < next{
                 return Ok(j);
             }
+            //println!("after next is {}", next);
             curr = next;
+            
         }
         
         Ok(0)
@@ -1113,11 +1126,78 @@ mod test {
 
     /// Test sortition vote function
     #[test]
-    fn test_dummy(){
-        let mut vrf = ECVRF::from_suite(CipherSuite::SECP256K1_SHA256_TAI).unwrap();
-        // Public Key (labelled as y)
-        let y = hex::decode("4ebd3943bcad3cc9aae2fb6a1e3cc22b054446dc8fcb779730425a0721dde55a")
-            .unwrap();
-        assert_eq!(vrf.sortition_vote(&y, 100 as u32, 10 as u32, 10000 as u64).unwrap(), 0);
+    fn test_sortition_with_100_fake_users(){
+        struct FakeUser{
+            owns: u32,
+            secure_key: [u8;32],
+            win_times:u16,
+            total_j:u32,
+            total_trials:u16
+        };
+
+        let mut total_winner_count = 0;
+        for _ in 0..100 {
+            let mut round_winner_count = 0;
+            let mut users: Vec<FakeUser> = Vec::new();
+            let user_count = 100;
+            let mut vrf = ECVRF::from_suite(CipherSuite::SECP256K1_SHA256_TAI).unwrap();
+            let mut secret_key = [0 as u8;32];
+
+            
+            for i in 1..user_count {
+                rand::rand_bytes(&mut secret_key).unwrap();
+                let alpha = hex::decode("73616d706c65").unwrap();
+
+                let pi = vrf.prove(&secret_key, &alpha).unwrap();
+                let hash: &[u8] = & vrf.proof_to_hash(&pi).unwrap();
+                let sized:[u8;32] = hash.try_into().expect("slice with incorrect length");
+                users.push( FakeUser{
+                    owns:i, 
+                    secure_key: sized,
+                    win_times: 0,
+                    total_j: 0,
+                    total_trials: 0,
+                });
+            }
+            
+            for e in users.iter_mut() {
+                let j = vrf.sortition_vote(&e.secure_key, e.owns as u32, 100 as u32, 10000 as u64).unwrap();
+                e.total_trials += 1;
+                if j > 0 {
+                    e.win_times += 1;
+                    e.total_j += j;
+                    round_winner_count += 1;
+                }
+                //println!("Element at position {}: {:?}", pos, e);
+            }
+
+            println!("find winner count {}", round_winner_count);
+            total_winner_count += round_winner_count;
+        }   
+    }
+
+    #[test]
+    fn test_div(){
+        fn hash256_to_ratio_f64(buf: &[u8;32])->f64{
+            let big_hash = BigNum::from_slice(buf).unwrap();
+            let max_buffer = BigNum::from_slice(&[std::u8::MAX;32]).unwrap();
+            let mut a = big_hash.to_owned().unwrap();
+            a.mul_word(std::u32::MAX);
+            let first = a.to_owned().unwrap();
+            let mut result: BigNum = &first / &max_buffer;
+
+            let v:u64 = result.div_word(std::u32::MAX).unwrap();
+            let ratio = v as f64 / std::u32::MAX as f64;
+            ratio
+        }
+        println!("Starting....");
+        
+        for i in 0..255 {
+            let buf : [u8;32] = [i as u8;32];
+            
+            println!("#{} - {}", i, hash256_to_ratio_f64(&buf));
+        }
+        
+        println!("Done...");
     }
 }

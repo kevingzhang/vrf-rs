@@ -1,0 +1,109 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+      {
+        "name": "(OSX) Launch",
+        "type": "lldb",
+        "request": "launch",
+        "program": "${workspaceRoot}/target/debug/foo",
+        "args": [],
+        "cwd": "${workspaceRoot}",
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'vrf'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=vrf"
+        ],
+        "filter": {
+          "name": "vrf",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug example 'generate_secp256k1'",
+      "cargo": {
+        "args": [
+          "build",
+          "--example=generate_secp256k1",
+          "--package=vrf"
+        ],
+        "filter": {
+          "name": "generate_secp256k1",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in example 'generate_secp256k1'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--example=generate_secp256k1",
+          "--package=vrf"
+        ],
+        "filter": {
+          "name": "generate_secp256k1",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug example 'basic'",
+      "cargo": {
+        "args": [
+          "build",
+          "--example=basic",
+          "--package=vrf"
+        ],
+        "filter": {
+          "name": "basic",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in example 'basic'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--example=basic",
+          "--package=vrf"
+        ],
+        "filter": {
+          "name": "basic",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
